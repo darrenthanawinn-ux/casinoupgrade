@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NEON NOIR — Casino RPG</title>
+<style>
+:root{
+  --bg:#07110e;--panel:#0c1c17;--panel2:#10251e;--green:#20e890;--gold:#ffd45a;
+  --red:#ff4d62;--cyan:#58e6ff;--text:#e7ffeF;--muted:#7fa89a;
+  --shadow:0 0 28px rgba(32,232,144,.12);
+}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#020706;color:var(--text);
+font-family:"Courier New",monospace}
+body{image-rendering:pixelated}
+button,input{font:inherit}
+button{cursor:pointer}
+#app{width:100vw;height:100vh;position:relative;background:
+radial-gradient(circle at 50% 40%,#123d2c 0,#06130f 42%,#020706 100%)}
+canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
+.screen{position:absolute;inset:0;display:none;align-items:center;justify-content:center}
+.screen.active{display:flex}
+.panel{background:rgba(6,17,14,.94);border:2px solid #1f7055;box-shadow:0 0 0 4px #06110d,var(--shadow);
+padding:24px;max-width:900px;width:min(92vw,900px)}
+.title{font-size:clamp(32px,7vw,72px);letter-spacing:6px;text-align:center;color:var(--gold);
+text-shadow:4px 4px #6d3420,0 0 20px rgba(255,212,90,.25);margin:0 0 8px}
+.subtitle{text-align:center;color:var(--muted);letter-spacing:3px;margin-bottom:30px}
+.menu{display:grid;gap:10px;max-width:420px;margin:auto}
+.btn{border:2px solid #2b7b5e;background:#0b2119;color:var(--text);padding:13px 16px;
+text-transform:uppercase;letter-spacing:2px;transition:.12s;box-shadow:inset 0 0 0 1px #05110c}
+.btn:hover{background:#16422f;color:var(--gold);transform:translateX(3px);border-color:var(--green)}
+.btn.primary{border-color:var(--gold);color:var(--gold)}
+.btn.danger{border-color:var(--red);color:#ff9aa7}
+.small{font-size:12px;color:var(--muted)}
+#hud{position:absolute;left:16px;right:16px;top:12px;display:none;pointer-events:none}
+.hudrow{display:flex;gap:8px;justify-content:space-between;align-items:center}
+.badge{background:rgba(3,12,9,.9);border:1px solid #29664f;padding:8px 10px;box-shadow:var(--shadow)}
+#message{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);max-width:80%;
+background:rgba(3,10,8,.94);border:1px solid #2c795c;padding:10px 14px;display:none;text-align:center}
+#interaction{position:absolute;bottom:72px;left:50%;transform:translateX(-50%);color:var(--gold);font-size:13px;
+background:rgba(0,0,0,.65);padding:7px 10px;display:none}
+.modal{position:absolute;inset:0;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;z-index:20}
+.modal.open{display:flex}
+.modal .panel{max-height:90vh;overflow:auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.stat{padding:10px;border:1px solid #245744;background:#091b14}
+.stat b{color:var(--gold)}
+label{display:block;margin:13px 0 6px;color:var(--muted)}
+input[type=range]{width:100%;accent-color:var(--green)}
+.toggle{display:flex;justify-content:space-between;align-items:center;border:1px solid #245744;padding:10px;margin:8px 0}
+input[type=checkbox]{width:20px;height:20px;accent-color:var(--green)}
+#scanlines{position:absolute;inset:0;pointer-events:none;z-index:50;display:none;
+background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0,rgba(0,0,0,.16) 1px,transparent 1px,transparent 4px);
+mix-blend-mode:overlay}
+#scanlines.on{display:block}
+.gameTitle{color:var(--gold);margin-top:0;text-align:center}
+.cards{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin:15px 0}
+.card{width:62px;height:86px;background:#e9eee9;color:#101513;border:2px solid #fff;display:flex;align-items:center;justify-content:center;
+font-weight:bold;font-size:18px;box-shadow:2px 2px 0 #000}
+.card.red{color:#b52335}
+.card.hidden{background:#173d30;color:#ffd45a;border-color:#2c8060}
+.center{text-align:center}
+.slot{display:flex;justify-content:center;gap:10px;margin:20px}
+.reel{width:92px;height:92px;border:3px solid var(--gold);background:#07130f;display:flex;align-items:center;justify-content:center;
+font-size:40px;box-shadow:0 0 18px rgba(255,212,90,.15)}
+.betrow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:12px}
+.dialogue{line-height:1.65;color:#c7e8db;min-height:100px}
+.npcname{color:var(--gold);font-weight:bold;margin-bottom:8px}
+.shopItem{border:1px solid #285d49;padding:13px;background:#091912}
+.shopItem h3{margin:0 0 7px;color:var(--cyan)}
+#gameover .panel{border-color:#8c3040}
+.over{font-size:42px;color:var(--red);text-align:center;text-shadow:3px 3px #25060b}
+@media(max-width:600px){.panel{padding:16px}.title{letter-spacing:2px}.card{width:50px;height:72px}.reel{width:70px;height:70px}}
+</style>
+</head>
+<body>
+<div id="app">
+<canvas id="world"></canvas>
+<div id="scanlines"></div>
+
+<div id="hud">
+  <div class="hudrow">
+    <div class="badge">SHIFT <span id="shift">1</span></div>
+    <div class="badge">ARCADE CHIPS <span id="chips">500</span></div>
+    <div class="badge">WINS <span id="wins">0</span></div>
+    <div class="badge">[E] INTERACT &nbsp; [ESC] PAUSE</div>
+  </div>
+</div>
+<div id="interaction"></div>
+<div id="message"></div>
+
+<section id="menu" class="screen active">
+  <div class="panel">
+    <h1 class="title">NEON NOIR</h1>
+    <div class="subtitle">THE MIDNIGHT ARCADE</div>
+    <div class="menu">
+      <button class="btn primary" onclick="newGame()">NEW GAME</button>
+      <button class="btn" id="continueBtn" onclick="continueGame()">CONTINUE / LOAD</button>
+      <button class="btn" onclick="openSettings()">SETTINGS</button>
+      <button class="btn" onclick="openCredits()">CREDITS</button>
+    </div>
+    <p class="small center" style="margin-top:24px">A fictional arcade RPG. Chips are score points only and have no cash value.</p>
+  </div>
+</section>
+
+<section id="game" class="screen">
+  <!-- Canvas is the game world. -->
+</section>
+
+<div id="settings" class="modal">
+  <div class="panel">
+    <h2 class="gameTitle">SETTINGS</h2>
+    <label>MASTER VOLUME <span id="masterVal"></span></label><input id="master" type="range" min="0" max="1" step=".05">
+    <label>MUSIC VOLUME <span id="musicVal"></span></label><input id="music" type="range" min="0" max="1" step=".05">
+    <label>SFX VOLUME <span id="sfxVal"></span></label><input id="sfx" type="range" min="0" max="1" step=".05">
+    <div class="toggle">CRT SCANLINES <input id="crt" type="checkbox"></div>
+    <label>PIXEL SCALE <span id="scaleVal"></span></label><input id="scale" type="range" min="1" max="4" step="1">
+    <label>TEXT SPEED <span id="textVal"></span></label><input id="textSpeed" type="range" min="1" max="3" step="1">
+    <div class="menu" style="margin-top:16px">
+      <button class="btn primary" onclick="closeModal('settings')">APPLY / CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<div id="credits" class="modal">
+  <div class="panel center">
+    <h2 class="gameTitle">CREDITS</h2>
+    <p>NEON NOIR — THE MIDNIGHT ARCADE</p>
+    <p class="small">Single-file HTML / CSS / Vanilla JavaScript</p>
+    <p class="small">Procedural Web Audio • Canvas Pixel Art • Local Save</p>
+    <button class="btn" onclick="closeModal('credits')">BACK</button>
+  </div>
+</div>
+
+<div id="pause" class="modal">
+  <div class="panel">
+    <h2 class="gameTitle">PAUSED</h2>
+    <div class="grid" id="pauseStats"></div>
+    <div class="menu" style="margin-top:15px">
+      <button class="btn primary" onclick="closeModal('pause')">RESUME</button>
+      <button class="btn" onclick="openSettings()">SETTINGS</button>
+      <button class="btn" onclick="openShop()">UPGRADES</button>
+      <button class="btn danger" onclick="toMenu()">RETURN TO MENU</button>
+    </div>
+  </div>
+</div>
+
+<div id="dialogue" class="modal">
+  <div class="panel">
+    <div class="npcname" id="npcName"></div>
+    <div class="dialogue" id="npcText"></div>
+    <div class="menu">
+      <button class="btn primary" onclick="nextDialogue()">CONTINUE</button>
+      <button class="btn" onclick="closeModal('dialogue')">LEAVE</button>
+    </div>
+  </div>
+</div>
+
+<div id="blackjack" class="modal">
+  <div class="panel center">
+    <h2 class="gameTitle">BLACKJACK — PRACTICE TABLE</h2>
+    <div class="small">Dealer stands on 17 • Chips are arcade score only</div>
+    <div>DEALER</div><div id="dealerCards" class="cards"></div>
+    <div>PLAYER</div><div id="playerCards" class="cards"></div>
+    <div id="bjStatus" class="small"></div>
+    <div class="betrow" id="bjBets"></div>
+    <div class="betrow" id="bjActions"></div>
+    <button class="btn" onclick="closeModal('blackjack')">LEAVE TABLE</button>
+  </div>
+</div>
+
+<div id="slots" class="modal">
+  <div class="panel center">
+    <h2 class="gameTitle">MIDNIGHT SLOTS</h2>
+    <div class="small">Match symbols to score arcade chips.</div>
+    <div class="slot"><div class="reel" id="r1">7</div><div class="reel" id="r2">★</div><div class="reel" id="r3">♦</div></div>
+    <div id="slotStatus" class="small"></div>
+    <div class="betrow" id="slotBets"></div>
+    <button class="btn" onclick="closeModal('slots')">LEAVE MACHINE</button>
+  </div>
+</div>
+
+<div id="dice" class="modal">
+  <div class="panel center">
+    <h2 class="gameTitle">LUCKY DICE</h2>
+    <p>Choose HIGH or LOW, then roll. This uses arcade points, not money.</p>
+    <div style="font-size:54px;color:var(--gold)" id="dieFace">?</div>
+    <div id="diceStatus" class="small">6 = high, 1 = low</div>
+    <div class="betrow" id="diceBets"></div>
+    <button class="btn" onclick="closeModal('dice')">LEAVE TABLE</button>
+  </div>
+</div>
+
+<div id="shop" class="modal">
+  <div class="panel">
+    <h2 class="gameTitle">THE BACK ROOM — UPGRADES</h2>
+    <div id="shopItems" class="grid"></div>
+    <div class="menu" style="margin-top:15px"><button class="btn" onclick="closeModal('shop')">BACK</button></div>
+  </div>
+</div>
+
+<div id="gameover" class="modal">
+  <div class="panel center">
+    <div class="over">SHIFT BUSTED</div>
+    <p>Your arcade chips reached zero.</p>
+    <p class="small">This roguelite reset is purely fictional score progression.</p>
+    <button class="btn primary" onclick="restartShift()">START NEW SHIFT</button>
+    <button class="btn" onclick="toMenu()">MAIN MENU</button>
+  </div>
+</div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   NEON NOIR
+   Single-file arcade RPG.
+   No external libraries, fonts, images, or audio files.
+   ============================================================ */
+
+const $ = id => document.getElementById(id);
+const canvas = $("world"), ctx = canvas.getContext("2d");
+let W=960,H=540,dpr=1, last=0, keys={}, audio=null;
+
+const DEFAULT_SETTINGS={master:.7,music:.35,sfx:.7,crt:true,scale:2,textSpeed:2};
+let settings=load("nn_settings",DEFAULT_SETTINGS);
+
+const state={
+  screen:"menu", shift:1, chips:500, wins:0, losses:0, score:0,
+  player:{x:480,y:410,speed:145,dir:1},
+  upgrades:{},
+  currentNpc:null, dialogueIndex:0,
+  blackjack:null
+};
+
+const npcs=[
+ {name:"MARA / BARTENDER",x:130,y:185,color:"#d85c8a",
+  lines:["The house doesn't know everything. Watch the tables, watch the people.",
+         "The blue-lit machine pays in strange patterns tonight.",
+         "If you're broke, don't panic. A fresh shift starts the story again."]},
+ {name:"VALE / HIGH ROLLER",x:790,y:175,color:"#58e6ff",
+  lines:["Luck is a rhythm. If you stop paying attention, it stops paying attention to you.",
+         "I only play for arcade points. Keeps the night interesting.",
+         "Try Blackjack if you want decisions instead of pure chance."]},
+ {name:"ROOK / FIXER",x:180,y:390,color:"#ffd45a",
+  lines:["I can improve your movement, your slot luck, or your card hints.",
+         "Bring chips to the back room. The upgrades stick for this run.",
+         "Nothing here has cash value. That's how we keep the neon honest."]},
+ {name:"SABLE / SECURITY",x:790,y:390,color:"#ff5b65",
+  lines:["Keep your hands to yourself and your eyes open.",
+         "The casino floor is a maze. Press E near people or tables.",
+         "Esc pauses the action. Don't blame the guards if you walk into a wall."]}
+];
+
+const interactables=[
+ {id:"slots",x:360,y:130,w:100,h:70,label:"SLOTS"},
+ {id:"blackjack",x:500,y:130,w:130,h:70,label:"BLACKJACK"},
+ {id:"dice",x:665,y:130,w:100,h:70,label:"DICE"},
+ {id:"shop",x:480,y:330,w:110,h:60,label:"BACK ROOM"}
+];
+
+function load(k,fallback){try{return {...fallback,...JSON.parse(localStorage.getItem(k)||"{}")}}catch{return {...fallback}}}
+function saveAll(){
+ localStorage.setItem("nn_settings",JSON.stringify(settings));
+ localStorage.setItem("nn_save",JSON.stringify({
+   shift:state.shift,chips:state.chips,wins:state.wins,losses:state.losses,score:state.score,
+   upgrades:state.upgrades
+ }));
+ updateContinue();
+}
+function loadGame(){
+ const s=load("nn_save",{shift:1,chips:500,wins:0,losses:0,score:0,upgrades:{}});
+ Object.assign(state,s); state.player.x=480;state.player.y=410;
+}
+function updateContinue(){ $("continueBtn").style.opacity=localStorage.getItem("nn_save")?"1":".45"; }
+
+function resize(){
+ dpr=Math.min(devicePixelRatio||1,2);
+ W=960;H=540;canvas.width=W*dpr;canvas.height=H*dpr;
+ ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+addEventListener("resize",resize); resize();
+
+function showScreen(id){
+ document.querySelectorAll(".screen").forEach(x=>x.classList.remove("active"));
+ if(id)$("menu").classList.toggle("active",id==="menu");
+ if(id==="game") $("game").classList.add("active");
+ state.screen=id;
+ $("hud").style.display=id==="game"?"block":"none";
+}
+
+function newGame(){
+ state.shift=1;state.chips=500;state.wins=0;state.losses=0;state.score=0;state.upgrades={};
+ state.player={x:480,y:410,speed:145,dir:1};
+ saveAll(); startGame(); sfx("click");
+}
+function continueGame(){if(!localStorage.getItem("nn_save"))return;loadGame();startGame();sfx("click")}
+function startGame(){showScreen("game"); audioStart(); updateHUD(); flash("Welcome to the Midnight Arcade.");}
+function toMenu(){closeAll();showScreen("menu");saveAll();sfx("click")}
+function restartShift(){
+ closeAll();state.shift++;state.chips=500;state.wins=0;state.losses=0;state.score=0;
+ state.upgrades={};state.player.x=480;state.player.y=410;saveAll();startGame();
+}
+function closeAll(){document.querySelectorAll(".modal").forEach(m=>m.classList.remove("open"))}
+function openModal(id){$(id).classList.add("open");}
+function closeModal(id){$(id).classList.remove("open");sfx("click")}
+function openSettings(){openModal("settings");syncSettings()}
+function openCredits(){openModal("credits")}
+function openShop(){renderShop();openModal("shop")}
+function pause(){
+ if(state.screen!=="game")return;
+ $("pauseStats").innerHTML=`
+ <div class="stat">SHIFT <b>${state.shift}</b></div>
+ <div class="stat">CHIPS <b>${state.chips}</b></div>
+ <div class="stat">WINS <b>${state.wins}</b></div>
+ <div class="stat">LOSSES <b>${state.losses}</b></div>
+ <div class="stat">UPGRADES <b>${Object.keys(state.upgrades).length}</b></div>`;
+ openModal("pause");sfx("click");
+}
+
+addEventListener("keydown",e=>{
+ keys[e.key.toLowerCase()]=true;
+ if(["arrowup","arrowdown","arrowleft","arrowright"," "].includes(e.key.toLowerCase()))e.preventDefault();
+ if(e.key==="Escape"){
+   if($("pause").classList.contains("open"))closeModal("pause");
+   else if(state.screen==="game"&&!document.querySelector(".modal.open"))pause();
+ }
+ if(e.key.toLowerCase()==="e" && state.screen==="game" && !document.querySelector(".modal.open"))interact();
+});
+addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
+
+function interact(){
+ let p=state.player,best=null,bd=999;
+ [...npcs,...interactables].forEach(o=>{
+   const d=Math.hypot(p.x-o.x,p.y-o.y);
+   if(d<bd){bd=d;best=o}
+ });
+ if(!best)return;
+ if(best.lines)startDialogue(best);
+ else if(best.id==="slots")openSlots();
+ else if(best.id==="blackjack")openBlackjack();
+ else if(best.id==="dice")openDice();
+ else if(best.id==="shop")openShop();
+}
+
+function startDialogue(n){state.currentNpc=n;state.dialogueIndex=0;renderDialogue();openModal("dialogue");sfx("click")}
+function renderDialogue(){
+ const n=state.currentNpc;
+ $("npcName").textContent=n.name;
+ $("npcText").textContent=n.lines[state.dialogueIndex];
+}
+function nextDialogue(){
+ state.dialogueIndex=(state.dialogueIndex+1)%state.currentNpc.lines.length;
+ renderDialogue();sfx("click");
+}
+
+function flash(msg){
+ $("message").textContent=msg;$("message").style.display="block";
+ clearTimeout(flash.t);flash.t=setTimeout(()=>$("message").style.display="none",2300);
+}
+function updateHUD(){
+ $("shift").textContent=state.shift;$("chips").textContent=state.chips;
+ $("wins").textContent=state.wins;
+}
+function award(n){
+ state.chips=Math.max(0,state.chips+n);
+ if(n>0){state.wins++;state.score+=n;sfx("win");flash("+"+n+" ARCADE CHIPS")}
+ else {state.losses++;sfx("lose");flash(n+" ARCADE CHIPS")}
+ updateHUD();saveAll();
+ if(state.chips<=0)setTimeout(()=>openModal("gameover"),350);
+}
+
+/* -------------------- SETTINGS -------------------- */
+function syncSettings(){
+ $("master").value=settings.master;$("music").value=settings.music;$("sfx").value=settings.sfx;
+ $("crt").checked=settings.crt;$("scale").value=settings.scale;$("textSpeed").value=settings.textSpeed;
+ updateSettingLabels();$("scanlines").classList.toggle("on",settings.crt);
+}
+function updateSettingLabels(){
+ $("masterVal").textContent=Math.round(settings.master*100)+"%";
+ $("musicVal").textContent=Math.round(settings.music*100)+"%";
+ $("sfxVal").textContent=Math.round(settings.sfx*100)+"%";
+ $("scaleVal").textContent=settings.scale+"x";
+ $("textVal").textContent=["Slow","Normal","Fast"][settings.textSpeed-1];
+}
+["master","music","sfx","scale","textSpeed"].forEach(id=>{
+ $(id).addEventListener("input",()=>{
+   settings[id]=parseFloat($(id).value);saveAll();updateSettingLabels();audioStart();
+ });
+});
+$("crt").addEventListener("change",()=>{settings.crt=$("crt").checked;$("scanlines").classList.toggle("on",settings.crt);saveAll()});
+syncSettings();updateContinue();
+
+/* -------------------- AUDIO -------------------- */
+function audioStart(){
+ if(!audio)audio=new (window.AudioContext||window.webkitAudioContext)();
+ if(audio.state==="suspended")audio.resume();
+}
+function tone(freq,dur,type="square",vol=.08,delay=0){
+ if(!audio||settings.master<=0)return;
+ const o=audio.createOscillator(),g=audio.createGain();
+ o.type=type;o.frequency.value=freq;
+ g.gain.setValueAtTime(0,audio.currentTime+delay);
+ g.gain.linearRampToValueAtTime(vol*settings.master*settings.sfx,audio.currentTime+delay+.01);
+ g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+delay+dur);
+ o.connect(g).connect(audio.destination);o.start(audio.currentTime+delay);o.stop(audio.currentTime+delay+dur+.03);
+}
+function sfx(kind){
+ audioStart();
+ if(kind==="click")tone(480,.06,"square",.05);
+ if(kind==="chip"){tone(720,.05,"square",.07);tone(980,.07,"square",.04,.05)}
+ if(kind==="flip"){tone(320,.08,"triangle",.05);tone(500,.08,"triangle",.04,.06)}
+ if(kind==="spin"){tone(180,.08,"sawtooth",.04);tone(230,.08,"sawtooth",.03,.07)}
+ if(kind==="win"){tone(660,.12,"square",.07);tone(880,.13,"square",.07,.12);tone(1100,.18,"square",.08,.25)}
+ if(kind==="lose"){tone(220,.18,"sawtooth",.06);tone(160,.25,"sawtooth",.05,.15)}
+ if(kind==="ding"){tone(1040,.15,"sine",.07);tone(1560,.2,"sine",.05,.12)}
+}
+
+/* -------------------- WORLD RENDER -------------------- */
+function update(dt){
+ if(state.screen!=="game"||document.querySelector(".modal.open"))return;
+ const p=state.player;let dx=0,dy=0;
+ if(keys.w||keys.arrowup)dy--; if(keys.s||keys.arrowdown)dy++;
+ if(keys.a||keys.arrowleft)dx--; if(keys.d||keys.arrowright)dx++;
+ const len=Math.hypot(dx,dy)||1;
+ const speed=p.speed*(state.upgrades.speed?1.22:1);
+ if(dx||dy){p.x+=dx/len*speed*dt;p.y+=dy/len*speed*dt;p.dir=dx<0?-1:1}
+ p.x=Math.max(35,Math.min(W-35,p.x));p.y=Math.max(85,Math.min(H-35,p.y));
+}
+function draw(){
+ ctx.clearRect(0,0,W,H);
+ drawRoom();
+ if(state.screen==="game")drawPlayer();
+ const near=findNearest();
+ $("interaction").style.display=(state.screen==="game"&&!document.querySelector(".modal.open")&&near)?"block":"none";
+ if(near)$("interaction").textContent=`[E] ${near.label||near.name}`;
+}
+function findNearest(){
+ let best=null,bd=65,p=state.player;
+ [...npcs,...interactables].forEach(o=>{
+  const d=Math.hypot(p.x-o.x,p.y-o.y);
+  if(d<bd){bd=d;best=o}
+ });
+ return best;
+}
+function drawRoom(){
+ // floor
+ ctx.fillStyle="#06120e";ctx.fillRect(0,0,W,H);
+ for(let y=75;y<H;y+=32)for(let x=0;x<W;x+=32){
+   ctx.fillStyle=((x/32+y/32)%2)?"#0a1b15":"#0c2119";ctx.fillRect(x,y,32,32);
+ }
+ // walls
+ ctx.fillStyle="#030806";ctx.fillRect(0,0,W,75);
+ ctx.fillStyle="#153b2c";ctx.fillRect(0,70,W,5);
+ ctx.fillStyle="#ffd45a";ctx.font="bold 22px monospace";ctx.textAlign="center";
+ ctx.fillText("NEON NOIR  //  MIDNIGHT ARCADE",W/2,43);
+ // decorative lights
+ for(let x=20;x<W;x+=40){ctx.fillStyle=(x/40%2)?"#ff4d62":"#20e890";ctx.fillRect(x,57,5,5)}
+ // tables
+ interactables.forEach(o=>{
+   if(o.id==="shop"){drawCounter(o.x,o.y,o.w,o.h,"BACK ROOM","#ffd45a");return}
+   ctx.fillStyle="#09291e";ctx.fillRect(o.x-o.w/2,o.y-o.h/2,o.w,o.h);
+   ctx.strokeStyle="#267357";ctx.lineWidth=3;ctx.strokeRect(o.x-o.w/2,o.y-o.h/2,o.w,o.h);
+   ctx.fillStyle="#123b2b";ctx.fillRect(o.x-o.w/2+7,o.y-o.h/2+7,o.w-14,o.h-14);
+   ctx.fillStyle="#ffd45a";ctx.font="bold 12px monospace";ctx.textAlign="center";ctx.fillText(o.label,o.x,o.y+5);
+   if(o.id==="slots"){ctx.fillStyle="#ff4d62";ctx.fillRect(o.x-28,o.y-25,16,30);ctx.fillRect(o.x-7,o.y-25,16,30);ctx.fillRect(o.x+14,o.y-25,16,30)}
+ });
+ npcs.forEach(n=>drawNPC(n));
+ // doors / plants / wall details
+ ctx.fillStyle="#091c15";ctx.fillRect(40,110,120,12);ctx.fillRect(800,110,120,12);
+ ctx.fillStyle="#2c7459";ctx.fillRect(42,112,116,2);ctx.fillRect(802,112,116,2);
+}
+function drawCounter(x,y,w,h,label,color){
+ ctx.fillStyle="#1b1710";ctx.fillRect(x-w/2,y-h/2,w,h);
+ ctx.strokeStyle=color;ctx.strokeRect(x-w/2,y-h/2,w,h);
+ ctx.fillStyle=color;ctx.font="bold 11px monospace";ctx.textAlign="center";ctx.fillText(label,x,y+4);
+}
+function drawNPC(n){
+ ctx.save();ctx.translate(n.x,n.y);
+ ctx.fillStyle="rgba(0,0,0,.35)";ctx.fillRect(-13,15,26,6);
+ ctx.fillStyle=n.color;ctx.fillRect(-9,-19,18,18);ctx.fillRect(-13,-1,26,25);
+ ctx.fillStyle="#111";ctx.fillRect(-5,-14,3,3);ctx.fillRect(3,-14,3,3);
+ ctx.fillStyle="#0b1712";ctx.fillRect(-18,3,5,15);ctx.fillRect(13,3,5,15);
+ ctx.fillRect(-9,24,6,8);ctx.fillRect(3,24,6,8);
+ ctx.restore();
+ ctx.fillStyle=n.color;ctx.font="9px monospace";ctx.textAlign="center";ctx.fillText(n.name.split(" / ")[0],n.x,n.y-27);
+}
+function drawPlayer(){
+ const p=state.player,t=performance.now()/180;
+ ctx.save();ctx.translate(p.x,p.y);ctx.scale(p.dir,1);
+ const bob=Math.sin(t)*1.5;
+ ctx.fillStyle="rgba(0,0,0,.4)";ctx.fillRect(-11,28,22,5);
+ ctx.fillStyle="#e7ffef";ctx.fillRect(-8,-24+bob,16,16);
+ ctx.fillStyle="#07110e";ctx.fillRect(-4,-19+bob,3,3);ctx.fillRect(3,-19+bob,3,3);
+ ctx.fillStyle="#58e6ff";ctx.fillRect(-12,-6,24,4);
+ ctx.fillStyle="#d7fff0";ctx.fillRect(-3,-2,6,25);
+ ctx.fillRect(-16,1,13,4);ctx.fillRect(3,1,13,4);
+ ctx.fillRect(-10,22,7,5);ctx.fillRect(3,22,7,5);
+ ctx.restore();
+}
+
+/* -------------------- SLOTS -------------------- */
+const symbols=["7","★","♦","BAR","◆","♣"];
+function openSlots(){
+ if(state.chips<=0)return;
+ renderBetButtons("slotBets",v=>spinSlots(v));
+ $("slotStatus").textContent="Choose an arcade-chip stake.";
+ openModal("slots");sfx("click");
+}
+function renderBetButtons(id,fn){
+ const el=$(id);el.innerHTML="";
+ [10,25,50,100].forEach(v=>{
+  const b=document.createElement("button");b.className="btn";b.textContent="PLAY "+v;
+  b.disabled=state.chips<v;b.onclick=()=>fn(v);el.appendChild(b);
+ });
+}
+function spinSlots(bet){
+ if(state.chips<bet)return;
+ state.chips-=bet;updateHUD();saveAll();sfx("spin");
+ let ticks=0;const timer=setInterval(()=>{
+   ["r1","r2","r3"].forEach(id=>$(id).textContent=symbols[Math.floor(Math.random()*symbols.length)]);
+   ticks++;
+   if(ticks>12){
+     clearInterval(timer);
+     const lucky=state.upgrades.lucky?1.12:1;
+     const a=$("r1").textContent,b=$("r2").textContent,c=$("r3").textContent;
+     let mult=0;if(a===b&&b===c)mult=a==="7"?12:6;else if(a===b||b===c||a===c)mult=2;
+     if(Math.random()<.07*lucky)mult=Math.max(mult,2);
+     const prize=Math.floor(bet*mult);
+     if(prize){state.chips+=prize;state.wins++;state.score+=prize;sfx("win");$("slotStatus").textContent=`WIN! +${prize} chips`}
+     else{state.losses++;sfx("lose");$("slotStatus").textContent="No match. Try another run."}
+     updateHUD();saveAll();if(state.chips<=0)setTimeout(()=>openModal("gameover"),400);
+   }
+ },75);
+}
+
+/* -------------------- DICE -------------------- */
+function openDice(){
+ renderBetButtons("diceBets",bet=>{
+  const choice=prompt("Type HIGH or LOW:","HIGH");
+  if(!choice)return;rollDice(bet,choice.toUpperCase());
+ });
+ $("diceStatus").textContent="1–3 LOW • 4–6 HIGH";
+ openModal("dice");sfx("click");
+}
+function rollDice(bet,choice){
+ if(state.chips<bet)return;
+ state.chips-=bet;const n=1+Math.floor(Math.random()*6);
+ $("dieFace").textContent=["⚀","⚁","⚂","⚃","⚄","⚅"][n-1];sfx("ding");
+ const correct=(choice==="HIGH"&&n>=4)||(choice==="LOW"&&n<=3);
+ if(correct){const prize=bet*2;state.chips+=prize;state.wins++;state.score+=prize;$("diceStatus").textContent=`Correct! +${prize} chips`;sfx("win")}
+ else{state.losses++;$("diceStatus").textContent=`The die landed ${n}.`;sfx("lose")}
+ updateHUD();saveAll();if(state.chips<=0)setTimeout(()=>openModal("gameover"),400);
+}
+
+/* -------------------- BLACKJACK -------------------- */
+const suits=["♠","♥","♦","♣"], ranks=["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+function deck(){
+ const d=[];for(const s of suits)for(const r of ranks)d.push({s,r});
+ return d.sort(()=>Math.random()-.5);
+}
+function handValue(h){
+ let v=0,a=0;h.forEach(c=>{if(c.r==="A"){v+=11;a++}else v+=["K","Q","J"].includes(c.r)?10:parseInt(c.r)});
+ while(v>21&&a){v-=10;a--}return v;
+}
+function cardHTML(c,hidden=false){
+ if(hidden)return `<div class="card hidden">?</div>`;
+ const red=["♥","♦"].includes(c.s)?" red":"";
+ return `<div class="card${red}">${c.r}${c.s}</div>`;
+}
+function openBlackjack(){
+ renderBJBetButtons();$("bjStatus").textContent="Choose a stake to deal.";
+ openModal("blackjack");sfx("click");
+}
+function renderBJBetButtons(){
+ const el=$("bjBets");el.innerHTML="";
+ [10,25,50,100].forEach(v=>{const b=document.createElement("button");b.className="btn";b.textContent="DEAL "+v;
+ b.disabled=state.chips<v;b.onclick=()=>startBJ(v);el.appendChild(b)});
+ $("bjActions").innerHTML="";
+}
+function startBJ(bet){
+ state.chips-=bet;state.blackjack={deck:deck(),bet,player:[],dealer:[],done:false,doubled:false};
+ const g=state.blackjack;g.player=[g.deck.pop(),g.deck.pop()];g.dealer=[g.deck.pop(),g.deck.pop()];
+ sfx("flip");renderBJ();
+ if(handValue(g.player)===21)finishBJ("blackjack");
+}
+function renderBJ(){
+ const g=state.blackjack;if(!g)return;
+ $("dealerCards").innerHTML=g.done?g.dealer.map(c=>cardHTML(c)).join(""):cardHTML(g.dealer[0])+cardHTML(null,true);
+ $("playerCards").innerHTML=g.player.map(c=>cardHTML(c)).join("");
+ $("bjStatus").textContent=`Player ${handValue(g.player)}${g.done?" • Dealer "+handValue(g.dealer):""}`;
+ const a=$("bjActions");a.innerHTML="";
+ if(!g.done){
+   ["HIT","STAND","DOUBLE"].forEach(x=>{
+    const b=document.createElement("button");b.className="btn";b.textContent=x;
+    b.onclick=()=>bjAction(x);b.disabled=x==="DOUBLE"&&(state.chips<g.bet||g.player.length!==2);a.appendChild(b);
+   });
+ }
+ else{
+   const b=document.createElement("button");b.className="btn primary";b.textContent="NEW HAND";b.onclick=()=>openBlackjack();a.appendChild(b);
+ }
+ updateHUD();
+}
+function bjAction(a){
+ const g=state.blackjack;if(!g||g.done)return;
+ if(a==="HIT"){g.player.push(g.deck.pop());sfx("flip");if(handValue(g.player)>21)finishBJ("bust")}
+ if(a==="STAND")dealerPlay();
+ if(a==="DOUBLE"){state.chips-=g.bet;g.bet*=2;g.doubled=true;g.player.push(g.deck.pop());sfx("flip");if(handValue(g.player)>21)finishBJ("bust");else dealerPlay()}
+ renderBJ();saveAll();
+}
+function dealerPlay(){
+ const g=state.blackjack;while(handValue(g.dealer)<17)g.dealer.push(g.deck.pop());
+ const p=handValue(g.player),d=handValue(g.dealer);
+ if(p>21)finishBJ("bust");else if(d>21)finishBJ("dealerBust");else if(p>d)finishBJ("win");else if(p<d)finishBJ("lose");else finishBJ("push");
+}
+function finishBJ(result){
+ const g=state.blackjack;if(!g||g.done)return;g.done=true;
+ let payout=0,msg="";
+ if(result==="blackjack"){payout=Math.floor(g.bet*2.5);msg="BLACKJACK!"}
+ if(result==="win"||result==="dealerBust"){payout=g.bet*2;msg="YOU WIN"}
+ if(result==="push"){payout=g.bet;msg="PUSH"}
+ if(result==="lose"||result==="bust"){payout=0;msg=result==="bust"?"BUST":"DEALER WINS"}
+ state.chips+=payout;
+ if(payout>g.bet){state.wins++;state.score+=payout;sfx("win")}else if(payout===g.bet)sfx("ding");else{state.losses++;sfx("lose")}
+ $("bjStatus").textContent=msg+" • "+(payout?`+${payout} returned`:"stake lost");
+ renderBJ();saveAll();if(state.chips<=0)setTimeout(()=>openModal("gameover"),400);
+}
+
+/* -------------------- SHOP -------------------- */
+const shop=[
+ {id:"speed",name:"NIGHT RUNNER",desc:"+22% movement speed.",cost:180},
+ {id:"lucky",name:"LUCKY CHARM",desc:"Slightly improves slot bonus rolls.",cost:220},
+ {id:"counter",name:"CARD COUNTER GLASSES",desc:"Shows dealer total while Blackjack is active.",cost:300}
+];
+function renderShop(){
+ const el=$("shopItems");el.innerHTML="";
+ shop.forEach(item=>{
+  const owned=state.upgrades[item.id];
+  const d=document.createElement("div");d.className="shopItem";
+  d.innerHTML=`<h3>${item.name}</h3><p class="small">${item.desc}</p><p>Cost: <b>${item.cost}</b> chips</p>`;
+  const b=document.createElement("button");b.className="btn";b.textContent=owned?"OWNED":"BUY";
+  b.disabled=owned||state.chips<item.cost;b.onclick=()=>buyUpgrade(item);
+  d.appendChild(b);el.appendChild(d);
+ });
+}
+function buyUpgrade(item){
+ if(state.upgrades[item.id]||state.chips<item.cost)return;
+ state.chips-=item.cost;state.upgrades[item.id]=true;sfx("ding");flash(item.name+" acquired!");
+ saveAll();renderShop();updateHUD();
+}
+
+/* Main loop */
+function loop(t){
+ const dt=Math.min(.035,(t-last)/1000||0);last=t;update(dt);draw();requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* Better keyboard pause behavior and save on close. */
+addEventListener("beforeunload",saveAll);
+
+/* If a settings modal was opened from pause, returning closes only settings. */
+$("settings").addEventListener("click",e=>{if(e.target===$("settings"))closeModal("settings")});
+$("credits").addEventListener("click",e=>{if(e.target===$("credits"))closeModal("credits")});
+
+/* Start menu with audio only after user interaction due browser autoplay rules. */
+document.addEventListener("pointerdown",()=>audioStart(),{once:true});
+</script>
+</body>
+</html>
